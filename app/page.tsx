@@ -188,7 +188,10 @@ export default function Home() {
   const [briefing, setBriefing] = useState('')
   const [briefingLoading, setBriefingLoading] = useState(false)
   const [showBriefing, setShowBriefing] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   // Load items from Supabase, migrate localStorage data if present
   useEffect(() => {
@@ -360,6 +363,28 @@ export default function Home() {
   const sectionLabel = SECTIONS.find(s => s.key === recentlyCaptured)?.label
   const cardProps = { onMove: moveItem, onDelete: deleteItem, onContextChange: changeContext, onComplete: completeItem, onUpdate: updateItem }
 
+  const searchResults = searchQuery.trim()
+    ? items.filter(i => {
+        const q = searchQuery.toLowerCase()
+        return (
+          i.title.toLowerCase().includes(q) ||
+          (i.notes ?? '').toLowerCase().includes(q) ||
+          i.raw.toLowerCase().includes(q) ||
+          (i.delegatedTo ?? '').toLowerCase().includes(q)
+        )
+      })
+    : []
+
+  function openSearch() {
+    setShowSearch(true)
+    setTimeout(() => searchRef.current?.focus(), 50)
+  }
+
+  function closeSearch() {
+    setShowSearch(false)
+    setSearchQuery('')
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 px-6 py-4">
@@ -369,6 +394,31 @@ export default function Home() {
             <p className="text-sm text-slate-400 mt-0.5">{today}</p>
           </div>
           <div className="flex items-center gap-4">
+            {/* Search */}
+            {showSearch ? (
+              <div className="flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-1.5">
+                <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 16 16">
+                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M10.5 10.5l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <input
+                  ref={searchRef}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Escape') closeSearch() }}
+                  placeholder="Search everything…"
+                  className="bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none w-48"
+                />
+                <button onClick={closeSearch} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+              </div>
+            ) : (
+              <button onClick={openSearch} title="Search" className="text-slate-400 hover:text-slate-600 transition-colors">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 16 16">
+                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M10.5 10.5l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </button>
+            )}
             {briefing && (
               <button
                 onClick={() => setShowBriefing(v => !v)}
@@ -471,75 +521,97 @@ export default function Home() {
       )}
 
       <div className="max-w-7xl mx-auto px-6 pb-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          {SECTIONS.slice(0, 2).map(section => (
-            <div key={section.key} className={`rounded-xl border ${section.color} p-4`}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`w-2.5 h-2.5 rounded-full ${section.dot}`} />
-                <h2 className="text-sm font-semibold text-slate-700">{section.label}</h2>
-                <span className="text-xs text-slate-400 ml-auto">{section.description}</span>
-                <span className="text-xs font-medium text-slate-500 bg-white/60 px-2 py-0.5 rounded-full">
-                  {sectionItems(section.key).length}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {sectionItems(section.key).length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-2">Nothing here yet</p>
-                ) : (
-                  sectionItems(section.key).map(item => (
-                    <ItemCard key={item.id} item={item} {...cardProps} />
-                  ))
-                )}
-              </div>
+        {/* Search results */}
+        {showSearch && searchQuery.trim() && (
+          <div className="mb-6">
+            <p className="text-xs text-slate-400 mb-3">
+              {searchResults.length === 0 ? 'No results' : `${searchResults.length} result${searchResults.length === 1 ? '' : 's'}`}
+            </p>
+            <div className="space-y-2">
+              {searchResults.map(item => (
+                <div key={item.id} className="relative">
+                  <span className={`absolute -left-3 top-3 w-2 h-2 rounded-full ${SECTIONS.find(s => s.key === item.section)?.dot ?? 'bg-slate-300'}`} />
+                  <ItemCard item={item} {...cardProps} />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-          {SECTIONS.slice(2).map(section => (
-            <div key={section.key} className={`rounded-xl border ${section.color} p-4`}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`w-2.5 h-2.5 rounded-full ${section.dot}`} />
-                <h2 className="text-sm font-semibold text-slate-700">{section.label}</h2>
-                <span className="text-xs text-slate-400 ml-auto">{section.description}</span>
-                <span className="text-xs font-medium text-slate-500 bg-white/60 px-2 py-0.5 rounded-full">
-                  {sectionItems(section.key).length}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {sectionItems(section.key).length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-2">Nothing here yet</p>
-                ) : (
-                  sectionItems(section.key).map(item => (
-                    <ItemCard key={item.id} item={item} {...cardProps} />
-                  ))
-                )}
-              </div>
+        {/* Normal dashboard — hidden while searching */}
+        {(!showSearch || !searchQuery.trim()) && (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              {SECTIONS.slice(0, 2).map(section => (
+                <div key={section.key} className={`rounded-xl border ${section.color} p-4`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={`w-2.5 h-2.5 rounded-full ${section.dot}`} />
+                    <h2 className="text-sm font-semibold text-slate-700">{section.label}</h2>
+                    <span className="text-xs text-slate-400 ml-auto">{section.description}</span>
+                    <span className="text-xs font-medium text-slate-500 bg-white/60 px-2 py-0.5 rounded-full">
+                      {sectionItems(section.key).length}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {sectionItems(section.key).length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-2">Nothing here yet</p>
+                    ) : (
+                      sectionItems(section.key).map(item => (
+                        <ItemCard key={item.id} item={item} {...cardProps} />
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {completedItems.length > 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <button
-              onClick={() => setShowCompleted(!showCompleted)}
-              className="flex items-center gap-2 w-full text-left"
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-              <h2 className="text-sm font-semibold text-slate-600">Completed</h2>
-              <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full ml-1">
-                {completedItems.length}
-              </span>
-              <span className="text-xs text-slate-400 ml-auto">{showCompleted ? '▲ hide' : '▼ show'}</span>
-            </button>
-            {showCompleted && (
-              <div className="space-y-2 mt-3">
-                {completedItems.map(item => (
-                  <ItemCard key={item.id} item={item} {...cardProps} />
-                ))}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+              {SECTIONS.slice(2).map(section => (
+                <div key={section.key} className={`rounded-xl border ${section.color} p-4`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={`w-2.5 h-2.5 rounded-full ${section.dot}`} />
+                    <h2 className="text-sm font-semibold text-slate-700">{section.label}</h2>
+                    <span className="text-xs text-slate-400 ml-auto">{section.description}</span>
+                    <span className="text-xs font-medium text-slate-500 bg-white/60 px-2 py-0.5 rounded-full">
+                      {sectionItems(section.key).length}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {sectionItems(section.key).length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-2">Nothing here yet</p>
+                    ) : (
+                      sectionItems(section.key).map(item => (
+                        <ItemCard key={item.id} item={item} {...cardProps} />
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {completedItems.length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <button
+                  onClick={() => setShowCompleted(!showCompleted)}
+                  className="flex items-center gap-2 w-full text-left"
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                  <h2 className="text-sm font-semibold text-slate-600">Completed</h2>
+                  <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full ml-1">
+                    {completedItems.length}
+                  </span>
+                  <span className="text-xs text-slate-400 ml-auto">{showCompleted ? '▲ hide' : '▼ show'}</span>
+                </button>
+                {showCompleted && (
+                  <div className="space-y-2 mt-3">
+                    {completedItems.map(item => (
+                      <ItemCard key={item.id} item={item} {...cardProps} />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>

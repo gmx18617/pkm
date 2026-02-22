@@ -4,7 +4,9 @@ import { ProcessedItem } from '@/lib/types'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const SYSTEM_PROMPT = `You are an intelligent personal assistant helping to organize incoming information for a busy professional.
+const SYSTEM_PROMPT = (today: string) => `You are an intelligent personal assistant helping to organize incoming information for a busy professional.
+
+Today's date is ${today}. Use this to resolve relative dates like "tomorrow", "next week", "Friday", etc. into exact YYYY-MM-DD values.
 
 When given raw input (a thought, email snippet, Slack message, task, note, etc.), analyze it and return a JSON object that categorizes it into the right place in their personal command center.
 
@@ -54,10 +56,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No text provided' }, { status: 400 })
     }
 
+    const today = new Date().toISOString().slice(0, 10)
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT(today),
       messages: [{ role: 'user', content: text }],
     })
 
