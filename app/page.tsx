@@ -185,6 +185,9 @@ export default function Home() {
   const [showCompleted, setShowCompleted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [briefing, setBriefing] = useState('')
+  const [briefingLoading, setBriefingLoading] = useState(false)
+  const [showBriefing, setShowBriefing] = useState(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Load items from Supabase, migrate localStorage data if present
@@ -238,6 +241,39 @@ export default function Home() {
 
     return () => { supabase.removeChannel(channel) }
   }, [])
+
+  const todayKey = new Date().toISOString().slice(0, 10)
+
+  async function generateBriefing(currentItems: Item[]) {
+    setBriefingLoading(true)
+    try {
+      const res = await fetch('/api/briefing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: currentItems }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      const { briefing } = await res.json()
+      setBriefing(briefing)
+      setShowBriefing(true)
+      localStorage.setItem('pkm-briefing', JSON.stringify({ date: todayKey, text: briefing }))
+    } catch {
+      setBriefing('')
+    } finally {
+      setBriefingLoading(false)
+    }
+  }
+
+  // Auto-generate briefing once per day after items load
+  useEffect(() => {
+    if (loading || loadError) return
+    const stored = localStorage.getItem('pkm-briefing')
+    if (stored) {
+      const { date, text } = JSON.parse(stored)
+      if (date === todayKey) { setBriefing(text); return }
+    }
+    generateBriefing(items)
+  }, [loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric'
@@ -332,27 +368,37 @@ export default function Home() {
             <h1 className="text-xl font-semibold text-slate-800 tracking-tight">Command Center</h1>
             <p className="text-sm text-slate-400 mt-0.5">{today}</p>
           </div>
-          <div className="flex gap-3 text-xs text-slate-400">
-            {loadError ? (
-              <span className="text-red-500 text-xs">DB error: {loadError}</span>
-            ) : loading ? (
-              <span className="text-slate-400 animate-pulse">Loading…</span>
-            ) : (
-              <>
-                {SECTIONS.map(s => (
-                  <span key={s.key} className="flex items-center gap-1">
-                    <span className={`w-2 h-2 rounded-full ${s.dot}`} />
-                    {sectionItems(s.key).length}
-                  </span>
-                ))}
-                {completedItems.length > 0 && (
-                  <span className="flex items-center gap-1 text-emerald-500">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    {completedItems.length} done
-                  </span>
-                )}
-              </>
+          <div className="flex items-center gap-4">
+            {briefing && (
+              <button
+                onClick={() => setShowBriefing(v => !v)}
+                className="text-xs text-indigo-400 hover:text-indigo-600 transition-colors"
+              >
+                {showBriefing ? 'Hide briefing' : 'Show briefing'}
+              </button>
             )}
+            <div className="flex gap-3 text-xs text-slate-400">
+              {loadError ? (
+                <span className="text-red-500 text-xs">DB error: {loadError}</span>
+              ) : loading ? (
+                <span className="text-slate-400 animate-pulse">Loading…</span>
+              ) : (
+                <>
+                  {SECTIONS.map(s => (
+                    <span key={s.key} className="flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${s.dot}`} />
+                      {sectionItems(s.key).length}
+                    </span>
+                  ))}
+                  {completedItems.length > 0 && (
+                    <span className="flex items-center gap-1 text-emerald-500">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      {completedItems.length} done
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -387,6 +433,42 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Daily Briefing */}
+      {(briefing || briefingLoading) && showBriefing && (
+        <div className="max-w-7xl mx-auto px-6 pb-4">
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Today's Briefing</span>
+                  {briefingLoading && <span className="text-xs text-indigo-300 animate-pulse">Thinking…</span>}
+                </div>
+                {briefing && (
+                  <p className="text-sm text-indigo-900 leading-relaxed">{briefing}</p>
+                )}
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => generateBriefing(items)}
+                  disabled={briefingLoading}
+                  title="Refresh briefing"
+                  className="text-xs text-indigo-400 hover:text-indigo-600 disabled:opacity-40 transition-colors"
+                >
+                  ↻
+                </button>
+                <button
+                  onClick={() => setShowBriefing(false)}
+                  title="Dismiss"
+                  className="text-xs text-indigo-300 hover:text-indigo-500 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-6 pb-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
