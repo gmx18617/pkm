@@ -183,6 +183,7 @@ export default function Home() {
   const [error, setError] = useState('')
   const [recentlyCaptured, setRecentlyCaptured] = useState<string | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [collapsedSections, setCollapsedSections] = useState<Set<Section>>(new Set())
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [briefing, setBriefing] = useState('')
@@ -244,6 +245,24 @@ export default function Home() {
 
     return () => { supabase.removeChannel(channel) }
   }, [])
+
+  // Persist collapsed sections to localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('pkm-collapsed')
+    if (stored) setCollapsedSections(new Set(JSON.parse(stored)))
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('pkm-collapsed', JSON.stringify([...collapsedSections]))
+  }, [collapsedSections])
+
+  function toggleSection(section: Section) {
+    setCollapsedSections(prev => {
+      const next = new Set(prev)
+      next.has(section) ? next.delete(section) : next.add(section)
+      return next
+    })
+  }
 
   const todayKey = new Date().toISOString().slice(0, 10)
 
@@ -542,51 +561,63 @@ export default function Home() {
         {(!showSearch || !searchQuery.trim()) && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              {SECTIONS.slice(0, 2).map(section => (
-                <div key={section.key} className={`rounded-xl border ${section.color} p-4`}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className={`w-2.5 h-2.5 rounded-full ${section.dot}`} />
-                    <h2 className="text-sm font-semibold text-slate-700">{section.label}</h2>
-                    <span className="text-xs text-slate-400 ml-auto">{section.description}</span>
-                    <span className="text-xs font-medium text-slate-500 bg-white/60 px-2 py-0.5 rounded-full">
-                      {sectionItems(section.key).length}
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {sectionItems(section.key).length === 0 ? (
-                      <p className="text-xs text-slate-400 italic py-2">Nothing here yet</p>
-                    ) : (
-                      sectionItems(section.key).map(item => (
-                        <ItemCard key={item.id} item={item} {...cardProps} />
-                      ))
+              {SECTIONS.slice(0, 2).map(section => {
+                const collapsed = collapsedSections.has(section.key)
+                return (
+                  <div key={section.key} className={`rounded-xl border ${section.color} p-4`}>
+                    <button onClick={() => toggleSection(section.key)} className="flex items-center gap-2 w-full text-left mb-0">
+                      <span className={`w-2.5 h-2.5 rounded-full ${section.dot}`} />
+                      <h2 className="text-sm font-semibold text-slate-700">{section.label}</h2>
+                      <span className="text-xs text-slate-400 ml-auto">{section.description}</span>
+                      <span className="text-xs font-medium text-slate-500 bg-white/60 px-2 py-0.5 rounded-full">
+                        {sectionItems(section.key).length}
+                      </span>
+                      <span className="text-xs text-slate-400 ml-1">{collapsed ? '▼' : '▲'}</span>
+                    </button>
+                    {!collapsed && (
+                      <div className="space-y-2 mt-3">
+                        {sectionItems(section.key).length === 0 ? (
+                          <p className="text-xs text-slate-400 italic py-2">Nothing here yet</p>
+                        ) : (
+                          sectionItems(section.key).map(item => (
+                            <ItemCard key={item.id} item={item} {...cardProps} />
+                          ))
+                        )}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-              {SECTIONS.slice(2).map(section => (
-                <div key={section.key} className={`rounded-xl border ${section.color} p-4`}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className={`w-2.5 h-2.5 rounded-full ${section.dot}`} />
-                    <h2 className="text-sm font-semibold text-slate-700">{section.label}</h2>
-                    <span className="text-xs text-slate-400 ml-auto">{section.description}</span>
-                    <span className="text-xs font-medium text-slate-500 bg-white/60 px-2 py-0.5 rounded-full">
-                      {sectionItems(section.key).length}
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {sectionItems(section.key).length === 0 ? (
-                      <p className="text-xs text-slate-400 italic py-2">Nothing here yet</p>
-                    ) : (
-                      sectionItems(section.key).map(item => (
-                        <ItemCard key={item.id} item={item} {...cardProps} />
-                      ))
+              {SECTIONS.slice(2).map(section => {
+                const collapsed = collapsedSections.has(section.key)
+                return (
+                  <div key={section.key} className={`rounded-xl border ${section.color} p-4`}>
+                    <button onClick={() => toggleSection(section.key)} className="flex items-center gap-2 w-full text-left mb-0">
+                      <span className={`w-2.5 h-2.5 rounded-full ${section.dot}`} />
+                      <h2 className="text-sm font-semibold text-slate-700">{section.label}</h2>
+                      <span className="text-xs text-slate-400 ml-auto">{section.description}</span>
+                      <span className="text-xs font-medium text-slate-500 bg-white/60 px-2 py-0.5 rounded-full">
+                        {sectionItems(section.key).length}
+                      </span>
+                      <span className="text-xs text-slate-400 ml-1">{collapsed ? '▼' : '▲'}</span>
+                    </button>
+                    {!collapsed && (
+                      <div className="space-y-2 mt-3">
+                        {sectionItems(section.key).length === 0 ? (
+                          <p className="text-xs text-slate-400 italic py-2">Nothing here yet</p>
+                        ) : (
+                          sectionItems(section.key).map(item => (
+                            <ItemCard key={item.id} item={item} {...cardProps} />
+                          ))
+                        )}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {completedItems.length > 0 && (
